@@ -45,24 +45,54 @@ features_df_numeric.columns = numeric_features
 # Fit the model
 model_knn.fit(features_df_numeric)
 
-# Fetch and preprocess the song catalog
-playlist_id = '37i9dQZF1DX0kbJZpiYdZl' # Change this to search other playlists for recommendations
-results = sp.playlist_tracks(playlist_id)
-tracks = results['items']
+# Fetch and preprocess the song catalog from which we will select songs to recommend users
+# playlist_id = '37i9dQZF1DX0kbJZpiYdZl' # Change this to search other playlists for recommendations
+# playlist_id = '37i9dQZF1DX4dyzvuaRJ0n'
+# playlist_id = '37i9dQZF1DX0MLFaUdXnjA'
+# results = sp.playlist_tracks(playlist_id)
+# tracks = results['items']
 
-while results['next']:
-    results = sp.next(results)
-    tracks.extend(results['items'])
+# while results['next']:
+#     results = sp.next(results)
+#     tracks.extend(results['items'])
+    
+playlist_ids = ['37i9dQZF1DX0kbJZpiYdZl', 
+                '37i9dQZEVXbNG2KDcFcKOF', 
+                '37i9dQZEVXbLiRSasKsNU9', 
+                '37i9dQZF1DX0XUsuxWHRQd',
+                '37i9dQZF1DX1lVhptIYRda',
+                '37i9dQZF1DWVqJMsgEN0F4',
+                '37i9dQZF1DX10zKzsJ2jva',
+                '37i9dQZF1DX4dyzvuaRJ0n',
+                '37i9dQZF1DX8uc99HoZBLU',
+                '37i9dQZF1DXao0JEaClQq9',
+                '37i9dQZF1DWZJmo7mlltU6',
+                '37i9dQZF1DX4SBhb3fqCJd',
+                '37i9dQZF1DWUileP28ODwg',
+                '37i9dQZF1DX9tPFwDMOaN1',
+                '37i9dQZF1DX4FcAKI5Nhzq'] 
+tracks = []
+song_catalog_features = []
+song_catalog_names = []
+song_catalog_artists = []
 
-# Fetch the song ids, names and artists
-song_catalog_ids = [track['track']['id'] for track in tracks]
-song_catalog_names = [track['track']['name'] for track in tracks]
-song_catalog_artists = [track['track']['artists'][0]['name'] for track in tracks]
+for playlist_id in playlist_ids:
+    results = sp.playlist_tracks(playlist_id)
+    cur_tracks = results['items']
+    while results['next']:
+        results = sp.next(results)
+        cur_tracks.extend(results['items'])
+    tracks.extend(cur_tracks)
+    # Fetch the song ids, names and artists
+    song_catalog_ids = [track['track']['id'] for track in cur_tracks]
+    cur_song_catalog_names = [track['track']['name'] for track in cur_tracks]
+    song_catalog_names.extend(cur_song_catalog_names)
+    cur_song_catalog_artists = [track['track']['artists'][0]['name'] for track in cur_tracks]
+    song_catalog_artists.extend(cur_song_catalog_artists)
+    cur_song_catalog_features = sp.audio_features(song_catalog_ids)
+    song_catalog_features.extend(cur_song_catalog_features)
 
-song_catalog_features = sp.audio_features(song_catalog_ids)
 song_catalog_df = pd.DataFrame(song_catalog_features)
-
-# Add the names and artists to the DataFrame
 song_catalog_df['name'] = song_catalog_names
 song_catalog_df['artist'] = song_catalog_artists
 
@@ -70,7 +100,7 @@ song_catalog_df_numeric = song_catalog_df[numeric_features]
 
 # Use the KNN model to find similar songs for each of the user's top tracks
 all_recommendations = []
-for track_features in features_df_numeric.values:
+for track_features in song_catalog_df_numeric.values:
     distances, indices = model_knn.kneighbors([track_features])
     all_recommendations.extend(indices.flatten())
 
@@ -78,6 +108,9 @@ for track_features in features_df_numeric.values:
 song_counts = Counter(all_recommendations)
 most_recommended_songs = song_counts.most_common()
 
+print(model_knn.get_params())
+
 # Print the recommended songs
 for index, count in most_recommended_songs[:10]: # Number of songs to recommend (Default: 10)
     print(f"{song_catalog_df['name'][index]} by {song_catalog_df['artist'][index]}")
+    
