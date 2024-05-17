@@ -70,7 +70,17 @@ playlist_ids = ['37i9dQZF1DX0kbJZpiYdZl',
                 '37i9dQZF1DX4SBhb3fqCJd',
                 '37i9dQZF1DWUileP28ODwg',
                 '37i9dQZF1DX9tPFwDMOaN1',
-                '37i9dQZF1DX4FcAKI5Nhzq'] 
+                '37i9dQZF1DX4FcAKI5Nhzq',
+                '37i9dQZF1E8OX5RkYXtx51',
+                '37i9dQZF1DWU0r6G8OGirN',
+                '37i9dQZF1DXd3AhRYJnfcl',
+                '2peJPuYDQJMsmEpjqMALnl',
+                '37i9dQZF1DWY0DyDKedRYY', 
+                '37i9dQZF1DWWjGdmeTyeJ6',
+                '37i9dQZF1DXd0ZFXhY0CRF',
+                '37i9dQZF1DWZgauS5j6pMv',
+                '37i9dQZF1DX3LyU0mhfqgP',
+                '37i9dQZF1DWX0o6sD1a6P5'] 
 tracks = []
 song_catalog_features = []
 song_catalog_names = []
@@ -97,6 +107,7 @@ song_catalog_df['name'] = song_catalog_names
 song_catalog_df['artist'] = song_catalog_artists
 
 song_catalog_df_numeric = song_catalog_df[numeric_features]
+print(f"type is {type(song_catalog_df_numeric)}")
 
 # Use the KNN model to find similar songs for each of the user's top tracks
 all_recommendations = []
