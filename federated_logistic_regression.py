@@ -3,9 +3,11 @@ import matplotlib.pyplot as plt
 from cryptographpy_helper import generate_cyclic_group, hkdf
 import secrets
 
+# np.random.seed(42)
+
 # Dataset
 d = 500
-train_n = 2000
+train_n = 2001
 test_n = 500
 X_train = np.random.normal(0,1, size=(train_n,d))
 a_true = np.random.normal(0,1, size=(d,1))
@@ -15,9 +17,9 @@ y_test = ((np.sign(X_test.dot(a_true)) + 1) / 2).flatten()
 
 # Constants
 num_iterations = 50
-num_clients = 10
-epochs = 25
-lambda_bits = 256
+num_clients = 3
+epochs = 50
+lambda_bits = 128
 alpha = 1
 epsilon = 1
 
@@ -73,7 +75,7 @@ class LogisticRegressionServer():
     self.weights = initial_weights
 
   def sigmoid(self, z):
-    return 1 / (1 + np.exp(-z))
+    return 1 / (1 + np.exp(np.float128(-z)))
 
   def update_weights(self, weights):
     self.weights = weights
@@ -102,20 +104,23 @@ print(f"Group G of order q={q} modulo p={p} with generator g={g}")
 
 scale = 2 / (num_clients * len(X_train_chunks[0]) * alpha * epsilon)
 noise = np.random.laplace(scale=scale, size=num_clients)
-noise *= rounding_factor
-noise = np.rint(noise).astype(int)
+# noise *= rounding_factor
+# noise = np.rint(noise).astype(int)
 
 print ("doing diffie helman key exchange")
 
-secret_keys = [[secrets.randbelow(q) for _ in range(num_clients)] for _ in range(num_clients)]
-public_keys = [[pow(g, secret_keys[i][j], p) for j in range(num_clients)] for i in range(num_clients)]
+# secret_keys = [[secrets.randbelow(q) for _ in range(num_clients)] for _ in range(num_clients)]
+# public_keys = [[pow(g, secret_keys[i][j], p) for j in range(num_clients)] for i in range(num_clients)]
+
+secret_keys = [secrets.randbelow(q) for _ in range(num_clients)]
+public_keys = [pow(g, secret_keys[i], p) for i in range(num_clients)]
 
 common_keys = [[None]*num_clients for _ in range(num_clients)]
 final_keys = [[None]*num_clients for _ in range(num_clients)]
 
 for i in range(num_clients):
     for j in range(num_clients):
-        c_ij = pow(public_keys[j][i], secret_keys[i][j], p)
+        c_ij = pow(public_keys[j], secret_keys[i], p)
         common_keys[i][j] = c_ij.to_bytes(lambda_bits,  byteorder='big')
         final_keys[i][j] = hkdf(b'', c_ij.to_bytes(lambda_bits,  byteorder='big'), b'', lambda_bits // 8)
 
@@ -124,38 +129,53 @@ for _ in range(epochs):
 
   local_weights = []
   for i in range(num_clients):
+    # print("train accuracy:", clients[i].evaluate(clients[i].X, clients[i].y))
     clients[i].train_local(num_iterations=num_iterations)
-    local_weight = clients[i].weights
+    local_weight = clients[i].weights.copy()
+    local_weight += 1
+    local_weight *= rounding_factor
+    local_weight = np.rint(local_weight).astype(int)
+    # local_weight += noise[i]
     local_weights.append(local_weight)
 
-  local_weights = np.array(local_weights)
-  min_weight = abs(np.min(local_weights))
-  local_weights += min_weight
-  local_weights *= rounding_factor
-  local_weights = np.rint(local_weights).astype(int)
+  # print("local weights: ", local_weights)
+
+  # local_weights = np.array(local_weights)
+  # original_weights = np.mean(local_weights, axis=0)
+  # print(np.mean(local_weights, axis=0))
+  # min_weight = abs(np.min(local_weights))
+  # min_weight = 1
+  # print(min_weight)
+  # local_weights += min_weight
+  # local_weights *= rounding_factor
+  # local_weights = np.rint(local_weights).astype(int)
 
   encrypted_weights = []
 
   for i in range(num_clients):
       sum_r_ij = sum(int.from_bytes(final_keys[i][j], 'big') for j in range(i+1, num_clients))
-      sum_r_ki = sum(int.from_bytes(final_keys[k][i], 'big') for k in range(i))
-      encrypted_weight = (local_weights[i] + sum_r_ij - sum_r_ki + noise[i]) % p
+      sum_r_ki = sum(int.from_bytes(final_keys[i][k], 'big') for k in range(i))
+      encrypted_weight = (local_weights[i] + sum_r_ij - sum_r_ki) % p
       encrypted_weights.append(encrypted_weight)
 
-  aggregate_weights = sum(encrypted_weights) % p / num_clients
+  aggregate_weights = sum(encrypted_weights) % p 
 
+  # print(aggregate_weights)
+
+  aggregate_weights /= num_clients
   aggregate_weights /= rounding_factor
-  aggregate_weights -= min_weight
+  aggregate_weights -= 1
   aggregate_weights = aggregate_weights.astype('float64')
 
-  
+  # print(aggregate_weights)
+
   server.update_weights(aggregate_weights)
 
   print("train accuracy", server.evaluate(X_train, y_train))
   print("test accuracy", server.evaluate(X_test, y_test))
 
   for i in range(num_clients):
-    clients[i].update_weights(server.weights)
+    clients[i].update_weights(aggregate_weights)
 
 
 baseline = LogisticRegressionClient(X_train, y_train, lr=0.1)
@@ -163,5 +183,4 @@ baseline.train_local(num_iterations=num_iterations * epochs)
 
 print("baseline train accuracy", baseline.evaluate(X_train, y_train))
 print("baseline test accuracy", baseline.evaluate(X_test, y_test))
-
 
