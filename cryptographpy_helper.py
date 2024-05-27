@@ -1,4 +1,6 @@
 from sympy import isprime, randprime
+from Crypto.Cipher import AES
+import base64
 import random
 import hashlib
 import hmac
@@ -53,6 +55,27 @@ def hkdf(salt: bytes, ikm: bytes, info: bytes, length: int) -> bytes:
     prk = hkdf_extract(salt, ikm)
     return hkdf_expand(prk, info, length)
 
+def aes_encrypt(data: bytes, key: bytes):
+    cipher = AES.new(key, AES.MODE_EAX)
+    ciphertext, tag = cipher.encrypt_and_digest(data)
+    nonce = cipher.nonce
+    combined = ciphertext + tag + nonce
+
+    return combined.hex()
+
+def aes_decrypt(encoded: str, key: bytes):
+    combined = bytes.fromhex(encoded)
+    
+    tag_size = 16
+    nonce_size = 16
+    nonce = combined[-nonce_size:]
+    tag = combined[-(tag_size + nonce_size):-tag_size]
+    ciphertext = combined[:-(tag_size + nonce_size)]
+
+    cipher = AES.new(key, AES.MODE_EAX, nonce=nonce)
+    data = cipher.decrypt_and_verify(ciphertext, tag)
+
+    return data
 
 def eval_polynomial(coeffs, x, p):
     """Evaluate a polynomial with given coefficients at x modulo p."""
@@ -80,6 +103,14 @@ def lagrange_interpolation(x, points, p):
 def recover_secret(shares, p):
     """Recover the secret from shares using Lagrange interpolation."""
     return lagrange_interpolation(0, shares, p)
+
+# secret = 234234234
+# key = hkdf(b'', secret.to_bytes(128,  byteorder='big'), b'', 32)
+# encoded = (aes_encrypt("hello".encode(), key))
+# print(ciphertext, tag, nonce)
+# print(str(ciphertext, 'utf-8'))
+# print((type(ciphertext)))
+# print(aes_decrypt(encoded, key))
 
 # lambda_bits = 8
 # p, q, g = generate_cyclic_group(lambda_bits)
