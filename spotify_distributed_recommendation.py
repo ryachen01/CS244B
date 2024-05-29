@@ -162,31 +162,31 @@ class SpotifyServer():
         song_catalog_df['artist'] = song_catalog_artists
 
         self.song_catalog_df_numeric = song_catalog_df[self.numeric_features]
-
-    def get_common_disliked_songs(self):
+        
+    def train_from_clients(self):
         local_weights = []
+        # gather local encrypted weights from models
         for i in range(self.num_clients):
             self.clients[i].run_knn()
             local_weight = self.clients[i].centroids
             print(f"Dimension of these weights {local_weight[0].shape}, length is {len(local_weight)}")
             local_weights.extend(local_weight)
         
-        # print(f"These are the local weights {local_weights}")
-        
+        # train the joint model @ the server
         self.model_kmeans.fit(local_weights)
+
+    def get_common_disliked_songs(self):        
+        # TODO: get songs from the catalog which are furthest from the aggregate centroids 
+        least_liked_songs = None
         
-        updated_centroids = self.model_kmeans.cluster_centers_
-        print(updated_centroids)
-        
-        disliked_songs_df = pd.DataFrame(updated_centroids, columns=self.numeric_features)
+        disliked_songs_df = pd.DataFrame(least_liked_songs, columns=self.numeric_features)
         disliked_songs_df['label'] = 0  # Label disliked songs with 0
-        
-        # Send these centroids back to the clients using socket/TCP connection
-        
+                
         return disliked_songs_df
                 
     def predict_top_songs(self):
-        print(2)
+        # TODO: similar to get_common_disliked_songs
+        return None
         
     def combine_clients_data(self):
         combined_df = pd.concat([client.features_df_numeric for client in self.clients], ignore_index=True)
