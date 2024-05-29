@@ -30,6 +30,7 @@ class Node:
     self.running = False
 
     try:
+        # self.socket.shutdown(socket.SHUT_RDWR)
         self.socket.close()
     except Exception as e:
         print(f"Error closing server socket: {e}")
@@ -48,9 +49,9 @@ class Node:
       try:
         self.socket.setblocking(0)
         conn, addr = self.socket.accept()
-        with self.lock:
-          self.connections.append(conn)
-          self.received_connections.append(conn)
+        # with self.lock:
+        self.connections.append(conn)
+        self.received_connections.append(conn)
         print(f"Accepted connection from {addr}")
 
         if (self.connection_handler):
@@ -64,36 +65,37 @@ class Node:
           
   def receive_messages(self):
     while self.running:
-      with self.lock:
+      # with self.lock:
         connections = self.connections
-      for conn in connections:
-        try:
-          conn.setblocking(0)
-          data = conn.recv(1024)
-          if data:
-            msg = data.decode()
-            while (msg[-1] != "\n"):
-              try:
-                data = conn.recv(1024)
-                if data:
-                  msg += data.decode()
-              except BlockingIOError:
-                    continue
-              except Exception as e:
-                print(e)
-                break
+        for conn in connections:
+          try:
+            conn.setblocking(0)
+            data = conn.recv(1024)
+            if data:
+              msg = data.decode()
+              while (msg[-1] != "\n"):
+                # conn.setblocking(1)
+                try:
+                  data = conn.recv(1024)
+                  if data:
+                    msg += data.decode()
+                except BlockingIOError:
+                      continue
+                except Exception as e:
+                  print(e)
+                  break
 
-            if (msg[-1] == "\n"):
-              messages = msg.splitlines()
-              for message in messages:
-                if (self.receiver_handler):
-                  self.receiver_handler(conn, json.loads(message))
-        except BlockingIOError:
-              continue
-        except Exception as e:
-          if (self.running):
-            print("receive message error:", e)
-          continue
+              if (msg[-1] == "\n"):
+                messages = msg.splitlines()
+                for message in messages:
+                  if (self.receiver_handler):
+                    self.receiver_handler(conn, json.loads(message))
+          except BlockingIOError:
+                continue
+          except Exception as e:
+            if (self.running):
+              print("receive message error:", e)
+            continue
 
 
   def connect_to_node(self, host, port):
@@ -101,9 +103,9 @@ class Node:
       try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((host, port))
-        with self.lock:
-          self.connections.append(sock)
-          self.outward_connections.append(sock)
+        # with self.lock:
+        self.connections.append(sock)
+        self.outward_connections.append(sock)
         print(f"Connected to {sock.getpeername()}")
         break
       except ConnectionRefusedError as e:
@@ -111,9 +113,9 @@ class Node:
         continue
 
   def send_message(self, message, conn):
-    with self.lock:
-      try:
-        conn.sendall((json.dumps(message) + "\n").encode())
-        
-      except Exception as e:
-          print(f"Node failed to send message: {e}")
+    # with self.lock:
+    try:
+      conn.sendall((json.dumps(message) + "\n").encode())
+      
+    except Exception as e:
+        print(f"Node failed to send message: {e}")

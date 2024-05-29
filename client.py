@@ -3,6 +3,7 @@ import numpy as np
 from cryptographpy_helper import hkdf, generate_shares, aes_encrypt, aes_decrypt
 from node import Node
 import spotipy
+import random
 import pandas as pd
 from spotipy.oauth2 import SpotifyOAuth
 from sklearn.neighbors import NearestNeighbors
@@ -15,6 +16,7 @@ from scipy.spatial import distance
 from sklearn.model_selection import train_test_split
 import federated_logistic_regression
 from cryptographpy_helper import generate_cyclic_group, hkdf
+import cryptographpy_helper
 import secrets
 
 GLOBAL_RANDOM_SEED = 244
@@ -152,10 +154,15 @@ class LogisticRegressionClient:
         spotify_client.get_features_of_outside_songs()
         disliked_songs = spotify_client.get_common_disliked_songs()
         client_dataset = [likes_df, disliked_songs]
+        ''' 
+        TODO: potentially problematic because this will prompt for multiple Spotify logins, one
+        for each client... solution: create big dataset in server.py, pass data from server to 
+        client
+        '''
         spotify_client.dataset = pd.concat(client_dataset)
         training_data = spotify_client.dataset.copy()
-        X = training_data.drop('label', axis=1)
-        y = training_data['label']
+        X = training_data.drop('labels', axis=1)
+        y = training_data['labels']
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.4, random_state=42)
         self.X = X_train

@@ -75,7 +75,7 @@ class LogisticRegressionServer():
     self.weights = initial_weights
 
   def sigmoid(self, z):
-    return 1 / (1 + np.exp(np.float128(-z)))
+    return 1 / (1 + np.exp(np.float16(-z)))
 
   def update_weights(self, weights):
     self.weights = weights
