@@ -363,7 +363,7 @@ class Client:
 num_clients = 5
 
 server_host = '192.168.192.231'
-server_port = 5000
+server_port = 2600
 
 clients = []
 
@@ -377,5 +377,6 @@ for client in clients:
     client.wait()
 
 for client in clients:
-    print("train accuracy", client.model.evaluate())
-    print("test accuracy", client.model.evaluate())
+  print(f"Hi! I am {client.client_port} and my host is {client.server_host} at port {client.server_port}")
+  print("train accuracy", client.model.evaluate())
+  print("test accuracy", client.model.evaluate())

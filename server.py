@@ -174,7 +174,7 @@ class Server:
 
 
 if __name__ == '__main__':
-    port = 5000
+    port = 2600
     num_clients = 5
     num_epochs = 50
     server = Server(port, num_clients, num_epochs)
