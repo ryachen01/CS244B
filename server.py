@@ -48,7 +48,9 @@ class Server:
       for key in self.encrypted_weights.keys():
         encrypted_weight = self.encrypted_weights[key]
         aggregate_weights = (sum(encrypted_weight) % p)
-        aggregate_weights = np.array(aggregate_weights).astype('int')
+        # TODO: temporary fix, clipped the weights so they don't overflow
+        aggregate_weights = np.clip(aggregate_weights, -2 ** 63 + 1, 2 ** 63 - 1)
+        aggregate_weights = np.array(aggregate_weights).astype('int64')     
         self.encrypted_weights[key] = aggregate_weights.tolist()
 
       for conn in self.node_set:
@@ -204,7 +206,7 @@ class Server:
 
 
 if __name__ == '__main__':
-    port = 2500
+    port = 2100
     num_clients = 5
     num_epochs = 50
     server = Server(port, num_clients, num_epochs)

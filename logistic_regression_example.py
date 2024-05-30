@@ -43,9 +43,7 @@ class SpotifyClient():
         self.centroids = self.model_kmeans.cluster_centers_
         
     def get_common_disliked_songs(self):
-
-        client_centroids = self.model_kmeans.cluster_centers_
-
+        client_centroids = self.centroids
         distances = []
         dislike_df = self.song_catalog_df_numeric.copy()
         for index, song_feature in self.song_catalog_df_numeric.iterrows():
@@ -54,7 +52,6 @@ class SpotifyClient():
                 cur_dist = distance.euclidean(song_feature.values, c)
                 total_dist += cur_dist
             distances.append(total_dist)
-            # all_songs_dict[tuple(song_feature.values)] = total_dist
         dislike_df['distance'] = distances
         top_50_dislike_df = dislike_df.nlargest(50, 'distance')
         top_50_dislike_df = top_50_dislike_df.drop(columns=['distance'])
@@ -86,7 +83,7 @@ class LogisticRegressionClient():
         self.weights = np.zeros(n)
 
     def sigmoid(self, z):
-        return 1 / (1 + np.exp(-z))
+        return 1 / (1 + np.exp(np.float16(-z)))
 
     def compute_cost(self, weights, lambda_reg):
         m = len(self.y)
@@ -112,24 +109,31 @@ class LogisticRegressionClient():
     def get_weights(self):
       return {"logistic_weights": self.weights}
 
-    def predict(self):
-        probabilities = self.sigmoid(self.X @ self.weights)
+    def predict(self, train_flag=True):
+        if train_flag:
+            probabilities = self.sigmoid(self.X @ self.weights)
+        else:
+            probabilities = self.sigmoid(self.X_test @ self.weights)
         return (probabilities >= 0.5).astype(int)
 
-    def evaluate(self):
-        y_pred = self.predict()
-        test_accuracy = 1 - np.mean(y_pred != self.y_test)
+    def evaluate(self, train_flag=True):
+        if train_flag:
+            y_pred = self.predict(train_flag=True)
+            test_accuracy = 1 - np.mean(y_pred != self.y)
+        else:
+            y_pred = self.predict(train_flag=False)
+            test_accuracy = 1 - np.mean(y_pred != self.y_test)
         return test_accuracy
 
 num_clients = 5
 
-''' Ryan's IP address! '''
+''' Ryan's IP address '''
 # server_host = '192.168.192.231'
 
-''' Young's IP address! '''
+''' Young's IP address '''
 server_host = '10.34.155.96'
 
-server_port = 2500
+server_port = 2100
 
 clients = []
 
@@ -148,5 +152,5 @@ for client in clients:
 
 for i, client in enumerate(clients):
   print(f"I am client {i} and here are my results:")
-  print("train accuracy: ", client.model.evaluate())
-  print("test accuracy: ", client.model.evaluate())
+  print("train accuracy: ", client.model.evaluate(train_flag=True))
+  print("test accuracy: ", client.model.evaluate(train_flag=False))
