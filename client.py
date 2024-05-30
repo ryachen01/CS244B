@@ -26,7 +26,7 @@ class Client:
     self.lambda_bits = 128
 
   def run(self):
-    print(f"Hey! I am running at server port {self.server_port}")
+    print(f"I am running at server port {self.server_port}")
     self.node.start()
     self.connect()
 

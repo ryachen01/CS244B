@@ -1,24 +1,18 @@
 import numpy as np
 from client import Client
-import secrets
 import numpy as np
 from cryptographpy_helper import hkdf, generate_shares, aes_encrypt, aes_decrypt
 from node import Node
 import spotipy
 import random
 import pandas as pd
-from spotipy.oauth2 import SpotifyOAuth
-from sklearn.neighbors import NearestNeighbors
 from sklearn.cluster import KMeans
 from collections import Counter
 import warnings
-import heapq
 import numpy as np
 from scipy.spatial import distance
 from sklearn.model_selection import train_test_split
-import federated_logistic_regression
 from cryptographpy_helper import generate_cyclic_group, hkdf
-import cryptographpy_helper
 import secrets
 
 GLOBAL_RANDOM_SEED = 244
@@ -31,25 +25,15 @@ client_id = '732c5cf894e54e68b3b406f8dbd93cc9'
 client_secret = '5bd65999851645be9906a38a53e6a21f'
 
 class SpotifyClient():
-    def __init__(self, num_samples=50):
+    def __init__(self, client_index, num_samples=50):
         # model setup
         self.num_samples = num_samples
         self.numeric_features = ['danceability', 'energy', 'key', 'loudness', 'mode', 'speechiness',
                                  'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo', 'duration_ms', 'time_signature']
         self.model_kmeans = KMeans(n_clusters=5, random_state=0, n_init="auto")
         self.log_reg = None
-        # data setup
-        self.sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=client_id,  # Your client ID
-                                                            client_secret=client_secret,  # Your client secret
-                                                            redirect_uri='http://localhost:8888/callback',
-                                                            scope='user-top-read',
-                                                            open_browser=False))
-        top_tracks = self.sp.current_user_top_tracks(limit=50)['items']
-        top_tracks_ids = [track['id'] for track in top_tracks]
-        top_tracks_features = self.sp.audio_features(top_tracks_ids)
-        features_df = pd.DataFrame(top_tracks_features)
-        self.features_df_numeric = features_df[self.numeric_features]
-        self.features_df_numeric.columns = self.numeric_features
+        self.features_df_numeric = pd.read_csv(f"data/client_{client_index}_playlist.csv")
+        self.song_catalog_df_numeric = pd.read_csv("data/song_catalog.csv")
         self.model_kmeans = KMeans(n_clusters=5, random_state=0)
         self.dataset = None
         self.log_reg = None
@@ -57,74 +41,7 @@ class SpotifyClient():
     def run_knn(self):
         self.model_kmeans.fit(self.features_df_numeric.to_numpy())
         self.centroids = self.model_kmeans.cluster_centers_
-
-    def get_features_of_outside_songs(self):
-        # Fetch and preprocess the song catalog from which we will select songs to recommend users
-        playlist_ids = ['37i9dQZF1DX0kbJZpiYdZl',
-                        '37i9dQZEVXbNG2KDcFcKOF',
-                        '37i9dQZEVXbLiRSasKsNU9',
-                        '37i9dQZF1DX0XUsuxWHRQd',
-                        '37i9dQZF1DX1lVhptIYRda',
-                        '37i9dQZF1DWVqJMsgEN0F4',
-                        '37i9dQZF1DX10zKzsJ2jva',
-                        '37i9dQZF1DX4dyzvuaRJ0n',
-                        '37i9dQZF1DX8uc99HoZBLU',
-                        '37i9dQZF1DXao0JEaClQq9',
-                        '37i9dQZF1DWZJmo7mlltU6',
-                        '37i9dQZF1DX4SBhb3fqCJd',
-                        '37i9dQZF1DWUileP28ODwg',
-                        '37i9dQZF1DX9tPFwDMOaN1',
-                        '37i9dQZF1DX4FcAKI5Nhzq',
-                        '37i9dQZF1E8OX5RkYXtx51',
-                        '37i9dQZF1DWU0r6G8OGirN',
-                        '37i9dQZF1DXd3AhRYJnfcl',
-                        '2peJPuYDQJMsmEpjqMALnl',
-                        '37i9dQZF1DWY0DyDKedRYY',
-                        '37i9dQZF1DWWjGdmeTyeJ6',
-                        '37i9dQZF1DXd0ZFXhY0CRF',
-                        '37i9dQZF1DWZgauS5j6pMv',
-                        '37i9dQZF1DX3LyU0mhfqgP',
-                        '37i9dQZF1DWX0o6sD1a6P5']
-        tracks = []
-        song_catalog_features = []
-        song_catalog_names = []
-        song_catalog_artists = []
-
-        for playlist_id in playlist_ids:
-            results = self.sp.playlist_tracks(playlist_id)
-            cur_tracks = results['items']
-            while results['next']:
-                results = self.sp.next(results)
-                cur_tracks.extend(results['items'])
-            tracks.extend(cur_tracks)
-            # Fetch the song ids, names and artists
-            song_catalog_ids = [track['track']['id'] for track in cur_tracks]
-            cur_song_catalog_names = [track['track']['name']
-                                      for track in cur_tracks]
-            song_catalog_names.extend(cur_song_catalog_names)
-            cur_song_catalog_artists = [
-                track['track']['artists'][0]['name'] for track in cur_tracks]
-            song_catalog_artists.extend(cur_song_catalog_artists)
-            cur_song_catalog_features = self.sp.audio_features(
-                song_catalog_ids)
-            song_catalog_features.extend(cur_song_catalog_features)
-            # TODO: Temp Fix due to Spotify maximum amount of items that can be returned in a search is 1000
-            if len(song_catalog_features) > 950:
-                break
-        none_indices = [i for i, feature in enumerate(
-            song_catalog_features) if feature is None]
-        # print(f"Indices of None values: {none_indices}")
-
-        # Remove elements at these indices from both lists, starting from the end
-        for index in sorted(none_indices, reverse=True):
-            del song_catalog_features[index]
-            del song_catalog_names[index]
-            del song_catalog_artists[index]
-        song_catalog_df = pd.DataFrame(song_catalog_features)
-        song_catalog_df['name'] = song_catalog_names
-        song_catalog_df['artist'] = song_catalog_artists
-        self.song_catalog_df_numeric = song_catalog_df[self.numeric_features]
-
+        
     def get_common_disliked_songs(self):
 
         client_centroids = self.model_kmeans.cluster_centers_
@@ -145,13 +62,12 @@ class SpotifyClient():
         return top_50_dislike_df
 
 class LogisticRegressionClient:
-    def __init__(self, lr=0.01, lambda_val=0.2):
+    def __init__(self, client_index, lr=0.01, lambda_val=0.2):
         # create a client's dataset
-        spotify_client = SpotifyClient()
+        spotify_client = SpotifyClient(client_index)
         likes_df = spotify_client.features_df_numeric.copy()
         likes_df['labels'] = 1
         spotify_client.run_knn()
-        spotify_client.get_features_of_outside_songs()
         disliked_songs = spotify_client.get_common_disliked_songs()
         client_dataset = [likes_df, disliked_songs]
         ''' 
@@ -223,7 +139,7 @@ server_port = 2500
 clients = []
 
 for i in range(num_clients):
-  model = LogisticRegressionClient()
+  model = LogisticRegressionClient(i)
   client = Client(server_host, server_port, model, model.X, model.y)
   print(f"Hi! I am client {i}")
   client.run()
