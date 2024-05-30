@@ -61,7 +61,7 @@ class SpotifyClient():
         top_50_dislike_df['labels'] = 0
         return top_50_dislike_df
 
-class LogisticRegressionClient:
+class LogisticRegressionClient():
     def __init__(self, client_index, lr=0.01, lambda_val=0.2):
         # create a client's dataset
         spotify_client = SpotifyClient(client_index)
@@ -70,11 +70,6 @@ class LogisticRegressionClient:
         spotify_client.run_knn()
         disliked_songs = spotify_client.get_common_disliked_songs()
         client_dataset = [likes_df, disliked_songs]
-        ''' 
-        TODO: potentially problematic because this will prompt for multiple Spotify logins, one
-        for each client... solution: create big dataset in server.py, pass data from server to 
-        client
-        '''
         spotify_client.dataset = pd.concat(client_dataset)
         training_data = spotify_client.dataset.copy()
         X = training_data.drop('labels', axis=1)
@@ -131,16 +126,18 @@ num_clients = 5
 ''' Ryan's IP address! '''
 # server_host = '192.168.192.231'
 
-''' Stanford's IP address! '''
+''' Young's IP address! '''
 server_host = '10.34.155.96'
 
-server_port = 2500
+server_port = 2600
 
 clients = []
 
 for i in range(num_clients):
   model = LogisticRegressionClient(i)
-  client = Client(server_host, server_port, model, model.X, model.y)
+  X = model.X
+  y = model.y
+  client = Client(server_host, server_port, model, X, y)
   print(f"Hi! I am client {i}")
   client.run()
   clients.append(client)
