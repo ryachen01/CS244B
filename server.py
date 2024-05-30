@@ -157,7 +157,6 @@ class Server:
               shares_dict[node_id].append(share)
 
           p, _, _ = self.cyclic_group_params
-          cur_node_ids = set(map(lambda conn: self.connection_dict[conn], self.node_set))
           for (node_id, shares) in shares_dict.items():
             recovered_secret_key = recover_secret(shares, p)   
             for conn in self.node_set:

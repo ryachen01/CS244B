@@ -14,25 +14,30 @@ class Node:
     self.received_messages = []
 
     self.lock = threading.Lock()
+
+    if port is None:
+      return
     self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     self.socket.bind(('0.0.0.0', self.port))
     self.socket.listen(5)
 
   def start(self):
     self.running = True
-    self.t1 = threading.Thread(target=self.accept_connections)
+    if not (self.port is None):
+      self.t1 = threading.Thread(target=self.accept_connections)
+      self.t1.start()
     self.t2 = threading.Thread(target=self.receive_messages)
-    self.t1.start()
     self.t2.start()
 
   def stop(self):
     print("Shutting down server...")
     self.running = False
-
-    try:
-        self.socket.close()
-    except Exception as e:
-        print(f"Error closing server socket: {e}")
+    
+    if not (self.port is None): 
+      try:
+          self.socket.close()
+      except Exception as e:
+          print(f"Error closing server socket: {e}")
 
     for conn in self.outward_connections:
       try:
