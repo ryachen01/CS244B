@@ -60,21 +60,27 @@ y_test = ((np.sign(X_test.dot(a_true)) + 1) / 2).flatten()
 X_train_chunks = np.split(X_train, num_clients)
 y_train_chunks = np.split(y_train, num_clients)
 
-server_host = '192.168.192.231'
+''' Ryan's IP address! '''
+# server_host = '192.168.192.231'
 
-server_port = 5000
+''' Stanford's IP address! '''
+server_host = '10.34.155.96'
+
+server_port = 2500
 
 clients = []
 
 for i in range(num_clients):
   model = LogisticRegressionClient(X_train_chunks[i], y_train_chunks[i])
   client = Client(server_host, server_port, model, X_train_chunks[i], y_train_chunks[i])
+  print(f"Hi! I am client {i}")
   client.run()
   clients.append(client)
 
 for client in clients:
   client.wait()
 
-for client in clients:
-  print("train accuracy", client.model.evaluate(X_train, y_train))
-  print("test accuracy", client.model.evaluate(X_test, y_test))
+for i, client in enumerate(clients):
+  print(f"I am client {i} and here are my results:")
+  print("train accuracy: ", client.model.evaluate(X_train, y_train))
+  print("test accuracy: ", client.model.evaluate(X_test, y_test))

@@ -1,5 +1,5 @@
 from sympy import isprime, randprime
-from Crypto.Cipher import AES
+from Cryptodome.Cipher import AES
 import base64
 import random
 import hashlib
