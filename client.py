@@ -37,9 +37,9 @@ class Client:
     self.node.connect_to_node(self.server_host, self.server_port)
 
   def train_model(self):
-    if (self.node_id == 0):
-      self.node.stop()
-      return
+    # if (self.node_id == 0):
+    #   self.node.stop()
+    #   return
     print("training model for epoch", self.cur_epoch)
     self.model.train_local(self.num_iterations)
 

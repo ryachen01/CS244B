@@ -129,7 +129,7 @@ num_clients = 5
 ''' Young's IP address! '''
 server_host = '10.34.155.96'
 
-server_port = 2600
+server_port = 2500
 
 clients = []
 
