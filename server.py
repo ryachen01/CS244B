@@ -4,6 +4,19 @@ from functools import partial
 from node import Node
 import threading
 
+def merge_dicts(dict1, dict2):
+  merged_dict = dict1.copy()
+  
+  for key, value in dict2.items():
+      if key in merged_dict:
+          if not isinstance(merged_dict[key], list):
+              merged_dict[key] = [merged_dict[key]]
+          merged_dict[key].append(value)
+      else:
+          merged_dict[key] = value
+  
+  return merged_dict
+
 class Server:
     def __init__(self, port, num_clients, num_epochs):
       self.port = port
@@ -15,7 +28,7 @@ class Server:
       self.node_set = set()
       self.new_node_set = set()
       self.public_keys = {}
-      self.encrypted_weights = []
+      self.encrypted_weights = {}
       self.encrypted_secret_shares = []
       self.decrypted_secret_shares = []
       self.node = Node(port, connection_handler=self.handle_connection, receiver_handler=self.handle_message)
@@ -31,12 +44,15 @@ class Server:
 
     def aggregate_weights(self):
       p, _, _ = self.cyclic_group_params
-      aggregate_weights = (sum(self.encrypted_weights) % p)
-      aggregate_weights = aggregate_weights.astype('int')
 
+      for key in self.encrypted_weights.keys():
+        encrypted_weight = self.encrypted_weights[key]
+        aggregate_weights = (sum(encrypted_weight) % p)
+        aggregate_weights = np.array(aggregate_weights).astype('int')
+        self.encrypted_weights[key] = aggregate_weights.tolist()
 
       for conn in self.node_set:
-        self.node.send_message(({"aggregate_weights": aggregate_weights.tolist()}), conn)
+        self.node.send_message(({"aggregate_weights": self.encrypted_weights}), conn)
 
       self.cur_epoch += 1
       if (self.cur_epoch == self.num_epochs):
@@ -44,7 +60,7 @@ class Server:
           self.node.send_message(({"status": "stop"}), conn)
         self.node.stop()
       else:
-        self.encrypted_weights = []
+        self.encrypted_weights = {}
         self.decrypted_secret_shares = []
         self.encrypted_secret_shares = []
         for conn in self.node_set:
@@ -131,16 +147,20 @@ class Server:
           self.handle_secret_shares()
 
       if "weights" in msg:
-        encrypted_weight = np.array(msg["weights"])
-        self.encrypted_weights.append(encrypted_weight)
+
+        weight_dict = msg["weights"]
+        for key in weight_dict.keys():
+          weight_dict[key] = np.array(weight_dict[key])
+        self.encrypted_weights = merge_dicts(self.encrypted_weights, weight_dict)
         self.new_node_set.add(conn)
 
-        if len(self.encrypted_weights) == self.threshold:
+
+        if len(self.new_node_set) == self.threshold:
           self.thread = threading.Thread(target=partial(self.delayed_func, self.recover_weights))
           self.event = threading.Event()
           self.thread.start()
         
-        if (len(self.encrypted_weights) == len(self.node_set)):
+        if (len(self.new_node_set) == len(self.node_set)):
           self.event.set()
           self.node_set = self.new_node_set
           self.new_node_set = set()
@@ -166,9 +186,20 @@ class Server:
               final_key = hkdf(b'', common_key.to_bytes(self.lambda_bits,  byteorder='big'), b'', self.lambda_bits // 8)
               key_val = int.from_bytes(final_key, 'big')
               if (pub_id > node_id):
-                self.encrypted_weights.append(key_val)
+                
+                key_dict = {}
+                for key in self.encrypted_weights.keys():
+                  key_dict[key] = [key_val]
+
+                self.encrypted_weights = merge_dicts(self.encrypted_weights, key_dict)
+                # self.encrypted_weights.append(key_val)
               elif (pub_id < node_id):
-                self.encrypted_weights.append(-key_val)
+                # self.encrypted_weights.append(-key_val)
+                key_dict = {}
+                for key in self.encrypted_weights.keys():
+                  key_dict[key] = [key_val]
+                  
+                self.encrypted_weights = merge_dicts(self.encrypted_weights, -key_dict)
           self.aggregate_weights()
 
 
