@@ -208,7 +208,7 @@ class Server:
 if __name__ == '__main__':
     port = 2100
     num_clients = 5
-    num_epochs = 50
+    num_epochs = 20
     server = Server(port, num_clients, num_epochs)
     server.run()
 

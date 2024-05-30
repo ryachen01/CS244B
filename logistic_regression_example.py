@@ -53,10 +53,10 @@ class SpotifyClient():
                 total_dist += cur_dist
             distances.append(total_dist)
         dislike_df['distance'] = distances
-        top_50_dislike_df = dislike_df.nlargest(50, 'distance')
-        top_50_dislike_df = top_50_dislike_df.drop(columns=['distance'])
-        top_50_dislike_df['labels'] = 0
-        return top_50_dislike_df
+        top_dislike_df = dislike_df.nlargest(25, 'distance')
+        top_dislike_df = top_dislike_df.drop(columns=['distance'])
+        top_dislike_df['labels'] = 0
+        return top_dislike_df
 
 class LogisticRegressionClient():
     def __init__(self, client_index, lr=0.01, lambda_val=0.2):
@@ -72,7 +72,7 @@ class LogisticRegressionClient():
         X = training_data.drop('labels', axis=1)
         y = training_data['labels']
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.4, random_state=42)
+            X, y, test_size=0.1, random_state=42)
         self.X = X_train
         self.y = y_train
         self.X_test = X_test
@@ -80,10 +80,11 @@ class LogisticRegressionClient():
         self.lr = lr
         self.lambda_val = lambda_val
         _, n = X.shape
-        self.weights = np.zeros(n)
+        # self.weights = np.zeros(n)
+        self.weights = np.random.rand(n)
 
     def sigmoid(self, z):
-        return 1 / (1 + np.exp(np.float16(-z)))
+        return 1 / (1 + np.exp((-z)))
 
     def compute_cost(self, weights, lambda_reg):
         m = len(self.y)
@@ -101,6 +102,7 @@ class LogisticRegressionClient():
 
     def update_weights(self, weights):
         self.weights = weights["logistic_weights"]
+        print(self.weights)
 
     def train_local(self, num_iterations):
         for _ in range(num_iterations):
