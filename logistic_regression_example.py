@@ -103,7 +103,7 @@ class LogisticRegressionClient():
         return gradient
 
     def update_weights(self, weights):
-        self.weights = weights
+        self.weights = weights["logistic_weights"]
 
     def train_local(self, num_iterations):
         for _ in range(num_iterations):

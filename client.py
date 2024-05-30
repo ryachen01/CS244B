@@ -37,29 +37,39 @@ class Client:
     self.node.connect_to_node(self.server_host, self.server_port)
 
   def train_model(self):
+    if (self.node_id == 0):
+      self.node.stop()
+      return
     print("training model for epoch", self.cur_epoch)
     self.model.train_local(self.num_iterations)
 
     scale = 2 / (self.num_clients * len(self.X))
     noise = np.random.laplace(scale=scale)
 
-    encrypted_weight = self.model.weights + noise
-    encrypted_weight += 1
-    encrypted_weight *= 1e6
-    encrypted_weight = np.rint(encrypted_weight).astype(int)
+    model_weights = self.model.get_weights()
+    
 
-    (p, _, _) = self.cyclic_group_params
+    for model_param in model_weights.keys():
 
-    for node_id in self.node_set:
-      key = self.shared_keys[node_id]
-      key_val = int.from_bytes(key, 'big')
-      if node_id > self.node_id:
-        encrypted_weight = (encrypted_weight + key_val) % p
-      else:
-        encrypted_weight = (encrypted_weight - key_val) % p
+      encrypted_weight = model_weights[model_param] + noise
+      encrypted_weight += 1
+      encrypted_weight *= 1e6
+      encrypted_weight = np.rint(encrypted_weight).astype(int)
 
+      (p, _, _) = self.cyclic_group_params
+
+      for node_id in self.node_set:
+        key = self.shared_keys[node_id]
+        key_val = int.from_bytes(key, 'big')
+        if node_id > self.node_id:
+          encrypted_weight = (encrypted_weight + key_val) % p
+        else:
+          encrypted_weight = (encrypted_weight - key_val) % p
+
+      model_weights[model_param] = list(encrypted_weight)
+      
     server_conn = self.node.outward_connections[0]
-    self.node.send_message(({"weights": encrypted_weight.tolist()}), server_conn)
+    self.node.send_message(({"weights": model_weights}), server_conn)
     self.cur_epoch += 1
 
   def handle_message(self, conn, msg):
@@ -101,12 +111,16 @@ class Client:
       self.num_clients = len(self.node_set) + 1
 
     if "aggregate_weights" in msg:
-      aggregate_weights = np.array(msg["aggregate_weights"]).astype('float64')
-      aggregate_weights /= (self.num_clients)
-      aggregate_weights /= 1e6
-      aggregate_weights -= 1
-      aggregate_weights = aggregate_weights.astype('float64')
-      self.model.update_weights(aggregate_weights)
+      aggregate_weight_dict = msg["aggregate_weights"]
+      for key in aggregate_weight_dict.keys():
+        aggregate_weight = np.array(aggregate_weight_dict[key]).astype('float64')
+        aggregate_weight /= (self.num_clients)
+        aggregate_weight /= 1e6
+        aggregate_weight -= 1
+        aggregate_weight = aggregate_weight.astype('float64')
+        aggregate_weight_dict[key] = aggregate_weight
+
+      self.model.update_weights(aggregate_weight_dict)
 
     if "recover_secrets" in msg:
       nodes_to_recover = msg["recover_secrets"]
