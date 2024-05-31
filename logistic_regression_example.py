@@ -24,6 +24,7 @@ warnings.filterwarnings("ignore")
 client_id = '732c5cf894e54e68b3b406f8dbd93cc9'
 client_secret = '5bd65999851645be9906a38a53e6a21f'
 
+
 class SpotifyClient():
     def __init__(self, client_index, num_samples=50):
         # model setup
@@ -32,7 +33,8 @@ class SpotifyClient():
                                  'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo', 'duration_ms', 'time_signature']
         self.model_kmeans = KMeans(n_clusters=5, random_state=0, n_init="auto")
         self.log_reg = None
-        self.features_df_numeric = pd.read_csv(f"data/client_{client_index}_playlist.csv")
+        self.features_df_numeric = pd.read_csv(
+            f"data/client_{client_index}_playlist.csv")
         self.song_catalog_df_numeric = pd.read_csv("data/song_catalog.csv")
         self.model_kmeans = KMeans(n_clusters=5, random_state=0)
         self.dataset = None
@@ -41,7 +43,7 @@ class SpotifyClient():
     def run_knn(self):
         self.model_kmeans.fit(self.features_df_numeric.to_numpy())
         self.centroids = self.model_kmeans.cluster_centers_
-        
+
     def get_common_disliked_songs(self):
 
         client_centroids = self.model_kmeans.cluster_centers_
@@ -60,6 +62,7 @@ class SpotifyClient():
         top_50_dislike_df = top_50_dislike_df.drop(columns=['distance'])
         top_50_dislike_df['labels'] = 0
         return top_50_dislike_df
+
 
 class LogisticRegressionClient:
     def __init__(self, client_index, lr=0.01, lambda_val=0.2):
@@ -112,19 +115,29 @@ class LogisticRegressionClient:
 
     def train_local(self, num_iterations):
         for _ in range(num_iterations):
-            self.weights -= self.lr * self.compute_gradient(self.weights, self.lambda_val)
+            self.weights -= self.lr * \
+                self.compute_gradient(self.weights, self.lambda_val)
 
     def get_weights(self):
-      return {"logistic_weights": self.weights}
+        return {"logistic_weights": self.weights}
 
-    def predict(self):
-        probabilities = self.sigmoid(self.X @ self.weights)
+    def predict(self, train_flag=True):
+        if train_flag:
+            probabilities = self.sigmoid(self.X @ self.weights)
+        else:
+            probabilities = self.sigmoid(self.X_test @ self.weights)
         return (probabilities >= 0.5).astype(int)
 
-    def evaluate(self):
-        y_pred = self.predict()
-        test_accuracy = 1 - np.mean(y_pred != self.y_test)
+    def evaluate(self, train_flag=True):
+        if train_flag:
+            y_pred = self.predict(train_flag=True)
+            test_accuracy = 1 - np.mean(y_pred != self.y)
+        else:
+            y_pred = self.predict(train_flag=False)
+            assert len(y_pred) == len(self.y_test)
+            test_accuracy = 1 - np.mean(y_pred != self.y_test)
         return test_accuracy
+
 
 num_clients = 5
 
@@ -132,24 +145,25 @@ num_clients = 5
 # server_host = '192.168.192.231'
 
 ''' Stanford's IP address! '''
-server_host = '10.34.155.96'
+# server_host = '10.34.155.96'
+server_host = '10.34.183.15'
 
 server_port = 2500
 
 clients = []
 
 for i in range(num_clients):
-  model = LogisticRegressionClient(i)
-  client = Client(server_host, server_port, model, model.X, model.y)
-  print(f"Hi! I am client {i}")
-  client.run()
-  clients.append(client)
+    model = LogisticRegressionClient(i)
+    client = Client(server_host, server_port, model, model.X, model.y)
+    print(f"Hi! I am client {i}")
+    client.run()
+    clients.append(client)
 
 for client in clients:
-  client.wait()
+    client.wait()
 
 
 for i, client in enumerate(clients):
-  print(f"I am client {i} and here are my results:")
-  print("train accuracy: ", client.model.evaluate())
-  print("test accuracy: ", client.model.evaluate())
+    print(f"I am client {i} and here are my results:")
+    print("train accuracy: ", client.model.evaluate(train_flag=True))
+    print("test accuracy: ", client.model.evaluate(train_flag=False))
