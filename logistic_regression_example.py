@@ -146,7 +146,7 @@ num_clients = 5
 
 ''' Stanford's IP address! '''
 # server_host = '10.34.155.96'
-server_host = '10.34.183.15'
+server_host = '10.31.195.78'
 
 server_port = 2500
 
