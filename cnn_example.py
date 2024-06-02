@@ -118,8 +118,8 @@ class CNN():
 
 
 def main():
-    server_host = "127.0.0.1" #192.168.192.231"
-    server_port = 5019
+    server_host = "35.85.53.9" #192.168.192.231"
+    server_port = 5001
 
     train_kwargs = {'batch_size': 16}
     test_kwargs = {'batch_size': 16}
@@ -138,7 +138,7 @@ def main():
 
     model = CNN(train_loader, test_loader)
     client = Client(
-       server_host, server_port, model, train_loader, test_loader
+       server_host, server_port, model, train_loader, test_loader, True
     )
     client.run()
     client.wait()
