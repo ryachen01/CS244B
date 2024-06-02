@@ -67,6 +67,7 @@ class Server:
             for conn in self.node_set:
                 self.node.send_message(({"status": "stop"}), conn)
             self.node.stop()
+            self.node.t2.join()
         else:
             self.encrypted_weights = {}
 
