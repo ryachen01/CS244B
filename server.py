@@ -128,7 +128,6 @@ class Server:
                 )
 
     def handle_message(self, conn, msg):
-
         if "public_key" in msg:
             pub_key = msg["public_key"]
             node_id = self.connection_dict[conn]
@@ -269,8 +268,8 @@ class Server:
 
 
 if __name__ == "__main__":
-    port = 5000
-    num_clients = 5
-    num_epochs = 50
+    port = 5019
+    num_clients = 2
+    num_epochs = 5
     server = Server(port, num_clients, num_epochs)
     server.run()

@@ -4,7 +4,26 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import StepLR
+from torch.utils.data import Dataset, DataLoader
+
 import numpy as np
+from client import Client
+
+class MNISTDataset(Dataset):
+    def __init__(self, image_file, label_file, transform):
+        self.images = np.load(image_file)
+        self.labels = np.load(label_file)
+        self.transform = transform
+    
+    def __len__(self):
+        return len(self.images)
+    
+    def __getitem__(self, idx):
+        image = self.images[idx]
+        image = self.transform(image)
+        label = self.labels[idx]
+
+        return image, label
 
 class Net(nn.Module):
     def __init__(self):
@@ -43,7 +62,7 @@ class CNN():
     self.scheduler = StepLR(self.optimizer, step_size=1, gamma=0.8)
     self.epoch = 0
 
-  def train(self):
+  def train_local(self, num_iterations):
       self.model.train()
       for batch_idx, (data, target) in enumerate(self.X):
           data, target = data.to(self.device), target.to(self.device)
@@ -56,7 +75,10 @@ class CNN():
               print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                   self.epoch, batch_idx * len(data), len(self.X.dataset),
                   100. * batch_idx / len(self.X), loss.item()))
-
+          
+          if batch_idx >= num_iterations:
+             break
+          
       self.epoch += 1
 
   def test(self):
@@ -78,41 +100,51 @@ class CNN():
         100. * correct / len(self.y.dataset)))
         
 
-  def model_to_json(self):
+  def get_weights(self):
     state_dict = self.model.state_dict()
-    def tensor_to_list(tensor):
-        return tensor.cpu().numpy().tolist()
+    def tensor_to_numpy(tensor):
+        return tensor.cpu().numpy()
 
-    json_compatible_state_dict = {key: tensor_to_list(value) for key, value in state_dict.items()}
+    json_compatible_state_dict = {key: tensor_to_numpy(value) for key, value in state_dict.items()}
     return json_compatible_state_dict
 
-  def json_to_model(self, weights):
+
+  def update_weights(self, weights):
     def list_to_tensor(lst):
       return torch.tensor(lst)
 
     state_dict = {key: list_to_tensor(value) for key, value in weights.items()}
     self.model.load_state_dict(state_dict)
 
+
 def main():
-    
-    train_kwargs = {'batch_size': 64}
-    test_kwargs = {'batch_size': 64}
+    server_host = "127.0.0.1" #192.168.192.231"
+    server_port = 5019
+
+    train_kwargs = {'batch_size': 16}
+    test_kwargs = {'batch_size': 16}
 
     transform=transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
         ])
-    dataset1 = datasets.MNIST('../data', train=True, download=True,
-                       transform=transform)
+    
+
+    dataset1 = MNISTDataset("mnist-images-part-1.npy", "mnist-labels-part-1.npy", transform)
     dataset2 = datasets.MNIST('../data', train=False,
                        transform=transform)
+    
     train_loader = torch.utils.data.DataLoader(dataset1,**train_kwargs)
     test_loader = torch.utils.data.DataLoader(dataset2, **test_kwargs)
 
     model = CNN(train_loader, test_loader)
-    model.train()
-    model.json_to_model(model.model_to_json())
-    model.test()
+    client = Client(
+       server_host, server_port, model, train_loader, test_loader
+    )
+    client.run()
+    client.wait()
+    client.model.test()
+
 
 if __name__ == '__main__':
     main()

@@ -36,10 +36,10 @@ class Client:
         self.node.connect_to_node(self.server_host, self.server_port)
 
     def train_model(self):
-
         print("training model for epoch", self.cur_epoch)
         (p, _, _) = self.cyclic_group_params
         self.model.train_local(self.num_iterations)
+        print("finished model training for epoch", self.cur_epoch)
 
         scale = 2 / (self.num_clients * len(self.X))
         noise = np.random.laplace(scale=scale)
@@ -54,13 +54,11 @@ class Client:
         double_mask_val = int.from_bytes(double_mask_key, "big")
 
         for model_param in model_weights.keys():
-
             encrypted_weight = model_weights[model_param] + noise
             encrypted_weight += 1e4
             encrypted_weight *= 1e6
             encrypted_weight = np.rint(encrypted_weight).astype(int)
             encrypted_weight = (encrypted_weight + double_mask_val) % p
-
             for node_id in self.node_set:
                 key = self.shared_keys[node_id]
                 key_val = int.from_bytes(key, "big")
@@ -69,14 +67,13 @@ class Client:
                 else:
                     encrypted_weight = (encrypted_weight - key_val) % p
 
-            model_weights[model_param] = list(encrypted_weight)
+            model_weights[model_param] = encrypted_weight.tolist()
 
         server_conn = self.node.outward_connections[0]
         self.node.send_message(({"weights": model_weights}), server_conn)
         self.cur_epoch += 1
 
     def handle_message(self, conn, msg):
-
         if "group_params" in msg:
             self.threshold = msg["group_params"][-1]
             self.cyclic_group_params = msg["group_params"][:3]

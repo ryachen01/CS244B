@@ -51,7 +51,7 @@ class Node:
   def accept_connections(self):
     while self.running:
       try:
-        self.socket.setblocking(0)
+        # self.socket.setblocking(0)
         conn, addr = self.socket.accept()
         with self.lock:
           self.connections.append(conn)
@@ -73,7 +73,7 @@ class Node:
         connections = self.connections
       for conn in connections:
         try:
-          conn.setblocking(0)
+          # conn.setblocking(0)
           data = conn.recv(1024)
           if data:
             msg = data.decode()
