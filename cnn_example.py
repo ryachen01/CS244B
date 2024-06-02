@@ -76,7 +76,7 @@ class CNN():
                   self.epoch, batch_idx * len(data), len(self.X.dataset),
                   100. * batch_idx / len(self.X), loss.item()))
           
-          if batch_idx >= num_iterations:
+          if num_iterations != -1 and batch_idx >= num_iterations:
              break
           
       self.epoch += 1
@@ -130,9 +130,8 @@ def main():
         ])
     
 
-    dataset1 = MNISTDataset("mnist-images-part-1.npy", "mnist-labels-part-1.npy", transform)
-    dataset2 = datasets.MNIST('../data', train=False,
-                       transform=transform)
+    dataset1 = MNISTDataset("../mnist_train/mnist-images-part-1.npy", "../mnist_train/mnist-labels-part-1.npy", transform)
+    dataset2 = MNISTDataset("../mnist_test/test-images.npy", "../mnist_test/test-labels.npy", transform)
     
     train_loader = torch.utils.data.DataLoader(dataset1,**train_kwargs)
     test_loader = torch.utils.data.DataLoader(dataset2, **test_kwargs)

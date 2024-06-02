@@ -5,7 +5,7 @@ from node import Node
 
 
 class Client:
-    def __init__(self, server_host, server_port, model, X, y):
+    def __init__(self, server_host, server_port, model, X, y, test_after_update=False):
         self.server_host = server_host
         self.server_port = server_port
         self.X = X
@@ -20,9 +20,10 @@ class Client:
         self.node_set = set()
 
         self.cur_epoch = 0
+        self.test_after_update = test_after_update
 
         # We should probably get this from the server but hard code for now
-        self.num_iterations = 100
+        self.num_iterations = -1
         self.lambda_bits = 128
 
     def run(self):
@@ -156,6 +157,9 @@ class Client:
                 aggregate_weight_dict[key] = aggregate_weight
 
             self.model.update_weights(aggregate_weight_dict)
+
+            if self.test_after_update:
+                self.model.test()
 
         if "recover_secrets" in msg:
             nodes_to_recover = msg["recover_secrets"]
