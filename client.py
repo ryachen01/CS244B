@@ -23,6 +23,7 @@ class Client:
         self.test_after_update = test_after_update
 
         # We should probably get this from the server but hard code for now
+        self.epsilon = 1e-7
         self.num_iterations = -1
         self.lambda_bits = 128
 
@@ -42,7 +43,7 @@ class Client:
         self.model.train_local(self.num_iterations)
         print("finished model training for epoch", self.cur_epoch)
 
-        scale = 2 / (self.num_clients * len(self.X))
+        scale = 2 / (self.num_clients * len(self.X) * self.epsilon)
         noise = np.random.laplace(scale=scale)
 
         model_weights = self.model.get_weights()
