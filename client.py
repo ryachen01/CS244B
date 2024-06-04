@@ -57,8 +57,8 @@ class Client:
 
         for model_param in model_weights.keys():
             encrypted_weight = model_weights[model_param] + noise
-            encrypted_weight += 1e4
-            encrypted_weight *= 1e6
+            # encrypted_weight += 1e4
+            # encrypted_weight *= 1e6
             encrypted_weight = np.rint(encrypted_weight).astype(int)
             encrypted_weight = (encrypted_weight + double_mask_val) % p
             for node_id in self.node_set:
@@ -152,8 +152,8 @@ class Client:
                     "float64"
                 )
                 aggregate_weight /= self.num_clients
-                aggregate_weight /= 1e6
-                aggregate_weight -= 1e4
+                # aggregate_weight /= 1e6
+                # aggregate_weight -= 1e4
                 aggregate_weight = aggregate_weight.astype("float64")
                 aggregate_weight_dict[key] = aggregate_weight
 
