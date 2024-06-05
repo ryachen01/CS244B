@@ -33,8 +33,10 @@ class SpotifyClient():
                                  'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo', 'duration_ms', 'time_signature']
         self.model_kmeans = KMeans(n_clusters=5, random_state=0, n_init="auto")
         self.log_reg = None
+        # self.features_df_numeric = pd.read_csv(
+        #     f"data/client_{client_index}_playlist.csv")
         self.features_df_numeric = pd.read_csv(
-            f"data/client_{client_index}_playlist.csv")
+            f"clients_data/user_{client_index}_10.csv").drop(columns=['labels'])
         self.song_catalog_df_numeric = pd.read_csv("data/song_catalog.csv")
         self.model_kmeans = KMeans(n_clusters=5, random_state=0)
         self.dataset = None
@@ -58,7 +60,7 @@ class SpotifyClient():
             distances.append(total_dist)
             # all_songs_dict[tuple(song_feature.values)] = total_dist
         dislike_df['distance'] = distances
-        top_50_dislike_df = dislike_df.nlargest(50, 'distance')
+        top_50_dislike_df = dislike_df.nlargest(100, 'distance')
         top_50_dislike_df = top_50_dislike_df.drop(columns=['distance'])
         top_50_dislike_df['labels'] = 0
         return top_50_dislike_df
@@ -146,7 +148,7 @@ num_clients = 5
 
 ''' Stanford's IP address! '''
 # server_host = '10.34.155.96'
-server_host = '10.31.195.78'
+server_host = '10.30.161.174'
 
 server_port = 2500
 
