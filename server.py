@@ -3,6 +3,7 @@ from cryptographpy_helper import generate_cyclic_group, recover_secret, hkdf
 from functools import partial
 from node import Node
 import threading
+import time
 
 
 def merge_dicts(dict1, dict2):
@@ -121,6 +122,7 @@ class Server:
         self.connection_dict[conn] = self.connection_count
         self.connection_count += 1
         if len(self.node_set) == self.num_clients:
+            self.time = time.time()
             for conn in self.node_set:
                 self.node.send_message(
                     ({"group_params": self.cyclic_group_params + (self.threshold,)}),
@@ -191,6 +193,7 @@ class Server:
             self.new_node_set.add(conn)
 
             if len(self.new_node_set) == self.threshold:
+                self.decrypted_secret_shares = []
                 self.thread = threading.Thread(
                     target=partial(self.delayed_func, self.recover_weights)
                 )
@@ -198,13 +201,16 @@ class Server:
                 self.thread.start()
 
             if len(self.new_node_set) == len(self.node_set):
-                self.decrypted_secret_shares = []
+                # self.decrypted_secret_shares = []
                 self.event.set()
                 self.recover_weights()
 
         if "decrypted_secret_shares" in msg:
 
-            self.decrypted_secret_shares.append(msg["decrypted_secret_shares"])
+            if len(self.decrypted_secret_shares) < self.threshold:
+                self.decrypted_secret_shares.append(msg["decrypted_secret_shares"])
+            else:
+                return
             shares_dict = {}
             if len(self.decrypted_secret_shares) == self.threshold:
                 for secret_shares in self.decrypted_secret_shares:
@@ -212,6 +218,7 @@ class Server:
                         if node_id not in shares_dict:
                             shares_dict[node_id] = []
                         shares_dict[node_id].append(share)
+                self.decrypted_secret_shares = []
 
                 p, _, _ = self.cyclic_group_params
                 active_nodes = list(
@@ -260,16 +267,16 @@ class Server:
                             elif pub_id < node_id:
                                 key_dict = {}
                                 for key in self.encrypted_weights.keys():
-                                    key_dict[key] = [key_val]
+                                    key_dict[key] = [-key_val]
                                 self.encrypted_weights = merge_dicts(
-                                    self.encrypted_weights, -key_dict
+                                    self.encrypted_weights, key_dict
                                 )
                 self.aggregate_weights()
 
 
 if __name__ == "__main__":
-    port = 5005
-    num_clients = 1
+    port = 5000
+    num_clients = 5
     num_epochs = 1
     server = Server(port, num_clients, num_epochs)
     server.run()
