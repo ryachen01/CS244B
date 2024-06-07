@@ -67,7 +67,6 @@ class Server:
             for conn in self.node_set:
                 self.node.send_message(({"status": "stop"}), conn)
             self.node.stop()
-            self.node.t2.join()
         else:
             self.encrypted_weights = {}
 
@@ -269,8 +268,9 @@ class Server:
 
 
 if __name__ == "__main__":
-    port = 5019
-    num_clients = 2
-    num_epochs = 5
+    port = 5005
+    num_clients = 1
+    num_epochs = 1
     server = Server(port, num_clients, num_epochs)
     server.run()
+    server.node.t2.join()
