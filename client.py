@@ -23,7 +23,7 @@ class Client:
         self.test_after_update = test_after_update
 
         # We should probably get this from the server but hard code for now
-        self.epsilon = 1e-7
+        self.epsilon = 1e-1
         self.num_iterations = -1
         self.lambda_bits = 128
 
@@ -57,8 +57,8 @@ class Client:
 
         for model_param in model_weights.keys():
             encrypted_weight = model_weights[model_param] + noise
-            # encrypted_weight += 1e4
-            # encrypted_weight *= 1e6
+            encrypted_weight += 1e4
+            encrypted_weight *= 1e6
             encrypted_weight = np.rint(encrypted_weight).astype(int)
             encrypted_weight = (encrypted_weight + double_mask_val) % p
             for node_id in self.node_set:
@@ -152,8 +152,8 @@ class Client:
                     "float64"
                 )
                 aggregate_weight /= self.num_clients
-                # aggregate_weight /= 1e6
-                # aggregate_weight -= 1e4
+                aggregate_weight /= 1e6
+                aggregate_weight -= 1e4
                 aggregate_weight = aggregate_weight.astype("float64")
                 aggregate_weight_dict[key] = aggregate_weight
 
@@ -216,7 +216,11 @@ class Client:
     def shamirs_secret_exchange(self, secret, message):
         (p, _, _) = self.cyclic_group_params
 
-        total_clients = max(self.node_id + 1, np.max(list(self.node_set)) + 1)
+        if len(list(self.node_set)) > 0:
+            total_clients = max(self.node_id + 1, np.max(list(self.node_set)) + 1)
+        else:
+            total_clients = self.node_id + 1
+
         secret_key_shares = generate_shares(secret, total_clients, self.threshold, p)
 
         encrypted_shares = []
