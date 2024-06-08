@@ -90,7 +90,7 @@ class LogisticRegressionClient:
         X = training_data.drop('labels', axis=1)
         y = training_data['labels']
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.4, random_state=42)
+            X, y, test_size=0.2, random_state=42)
         self.X = X_train
         self.y = y_train
         self.X_test = X_test
@@ -165,8 +165,8 @@ class LogisticRegressionClient:
 
         logits = self.sigmoid(dataset_scaled @ self.weights)
         top_10_indices = np.argsort(logits)[-10:][::-1]  # Get top 10 highest logits
-        print(top_10_indices)
-        print(logits[top_10_indices])
+        # print(top_10_indices)
+        # print(logits[top_10_indices])
         top_10_songs = self.spotify_client.song_catalog_names.iloc[top_10_indices]
         return top_10_songs
 
