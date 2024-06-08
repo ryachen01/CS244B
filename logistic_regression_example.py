@@ -66,22 +66,7 @@ class SpotifyClient():
     
 
     def get_favorite_songs(self):
-
-        client_centroids = self.model_kmeans.cluster_centers_
-
-        distances = []
-        like_df = self.song_catalog_df_numeric.copy()
-        for index, song_feature in self.song_catalog_df_numeric.iterrows():
-            total_dist = 0
-            for c in client_centroids:
-                cur_dist = distance.euclidean(song_feature.values, c)
-                total_dist += cur_dist
-            distances.append(total_dist)
-            # all_songs_dict[tuple(song_feature.values)] = total_dist
-        like_df['distance'] = distances
-        top_10_liked_df = like_df.nsmallest(10, 'distance')
-        return top_10_liked_df["Name"]
-
+        return
 
 
 class LogisticRegressionClient:
@@ -148,12 +133,10 @@ class LogisticRegressionClient:
         else:
             probabilities = self.sigmoid(self.X_test @ self.weights)
 
-
         sorted_probabilities = np.sort(probabilities)  # Get indices of sorted probabilities
         sorted_dotprod = np.sort(self.X @ self.weights)
-        # Print the sorted probabilities
+
         print(sorted_probabilities, sorted_dotprod)
-            
         # print(self.X)
         # print(self.weights.shape)
         
