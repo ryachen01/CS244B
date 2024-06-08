@@ -36,6 +36,7 @@ class SpotifyClient():
         self.features_df_numeric = pd.read_csv(
             f"data/client_{client_index}_playlist.csv")
         self.song_catalog_df_numeric = pd.read_csv("data/song_catalog.csv")
+        self.song_catalog_names = pd.read_csv("data/song_catalog_names.csv")
         self.model_kmeans = KMeans(n_clusters=5, random_state=0)
         self.dataset = None
         self.log_reg = None
@@ -62,6 +63,25 @@ class SpotifyClient():
         top_50_dislike_df = top_50_dislike_df.drop(columns=['distance'])
         top_50_dislike_df['labels'] = 0
         return top_50_dislike_df
+    
+
+    def get_favorite_songs(self):
+
+        client_centroids = self.model_kmeans.cluster_centers_
+
+        distances = []
+        like_df = self.song_catalog_df_numeric.copy()
+        for index, song_feature in self.song_catalog_df_numeric.iterrows():
+            total_dist = 0
+            for c in client_centroids:
+                cur_dist = distance.euclidean(song_feature.values, c)
+                total_dist += cur_dist
+            distances.append(total_dist)
+            # all_songs_dict[tuple(song_feature.values)] = total_dist
+        like_df['distance'] = distances
+        top_10_liked_df = like_df.nsmallest(10, 'distance')
+        return top_10_liked_df["Name"]
+
 
 
 class LogisticRegressionClient:
@@ -80,10 +100,11 @@ class LogisticRegressionClient:
         '''
         spotify_client.dataset = pd.concat(client_dataset)
         training_data = spotify_client.dataset.copy()
+        self.spotify_client = spotify_client
         X = training_data.drop('labels', axis=1)
         y = training_data['labels']
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.4, random_state=42)
+            X, y, test_size=0.2, random_state=42)
         self.X = X_train
         self.y = y_train
         self.X_test = X_test
@@ -126,6 +147,16 @@ class LogisticRegressionClient:
             probabilities = self.sigmoid(self.X @ self.weights)
         else:
             probabilities = self.sigmoid(self.X_test @ self.weights)
+
+
+        sorted_probabilities = np.sort(probabilities)  # Get indices of sorted probabilities
+        sorted_dotprod = np.sort(self.X @ self.weights)
+        # Print the sorted probabilities
+        print(sorted_probabilities, sorted_dotprod)
+            
+        # print(self.X)
+        # print(self.weights.shape)
+        
         return (probabilities >= 0.5).astype(int)
 
     def evaluate(self, train_flag=True):
@@ -137,6 +168,15 @@ class LogisticRegressionClient:
             assert len(y_pred) == len(self.y_test)
             test_accuracy = 1 - np.mean(y_pred != self.y_test)
         return test_accuracy
+    
+    def top_songs(self):
+        logits = self.sigmoid(self.spotify_client.song_catalog_df_numeric @ self.weights)
+        top_10_indices = np.argsort(logits)[-10:][::-1]  # Get top 10 highest logits
+        # print(top_10_indices)
+        # print(np.argsort(logits))
+        # print(logits)
+        top_10_songs = self.spotify_client.song_catalog_names.iloc[top_10_indices]
+        return top_10_songs
 
 
 num_clients = 5
@@ -146,9 +186,9 @@ num_clients = 5
 
 ''' Stanford's IP address! '''
 # server_host = '10.34.155.96'
-server_host = '10.31.195.78'
+server_host = '10.31.196.86'
 
-server_port = 2500
+server_port = 2600
 
 clients = []
 
@@ -167,3 +207,4 @@ for i, client in enumerate(clients):
     print(f"I am client {i} and here are my results:")
     print("train accuracy: ", client.model.evaluate(train_flag=True))
     print("test accuracy: ", client.model.evaluate(train_flag=False))
+    print("top 10 songs: \n ", client.model.top_songs())

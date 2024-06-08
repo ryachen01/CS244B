@@ -104,9 +104,11 @@ class SpotifyDataScraper():
         song_catalog_df['name'] = song_catalog_names
         song_catalog_df['artist'] = song_catalog_artists
         
-        return song_catalog_df[self.numeric_features]
+        return song_catalog_df[self.numeric_features], song_catalog_df[['name', 'artist']]
 
 scraper = SpotifyDataScraper()
-scraper.get_song_features(scraper.song_catalog).to_csv('song_catalog.csv', index=False)  # Save without index
-for i, playlist in enumerate(scraper.client_playlists):
-    scraper.get_song_features([playlist]).to_csv(f'client_{i}_playlist.csv', index=False)
+song_catalog_df, song_names = scraper.get_song_features(scraper.song_catalog)
+song_catalog_df.to_csv('song_catalog.csv', index=False)  # Save without index
+song_names.to_csv('song_catalog_names.csv', index=False)  # Save without index
+# for i, playlist in enumerate(scraper.client_playlists):
+#     scraper.get_song_features([playlist]).to_csv(f'client_{i}_playlist.csv', index=False)
