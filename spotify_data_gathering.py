@@ -55,7 +55,8 @@ class SpotifyDataScraper():
             '1x8VWfbVSqnwve8vDSQrNJ',
             '7asSzG1o9Uk0gEvHYBOPmE',
             '72G67PRZ1wyB6jTqmOibST',
-            '046pYQXBbos7N2LQG02Abd' # this playlist is mine again
+            '046pYQXBbos7N2LQG02Abd',
+            
         ]
         
         # data setup
@@ -90,7 +91,7 @@ class SpotifyDataScraper():
                 song_catalog_ids)
             song_catalog_features.extend(cur_song_catalog_features)
             # TODO: Temp Fix due to Spotify maximum amount of items that can be returned in a search is 1000
-            if len(song_catalog_features) > 950:
+            if len(song_catalog_features) > 999:
                 break
         none_indices = [i for i, feature in enumerate(
             song_catalog_features) if feature is None]

@@ -14,6 +14,7 @@ from scipy.spatial import distance
 from sklearn.model_selection import train_test_split
 from cryptographpy_helper import generate_cyclic_group, hkdf
 import secrets
+from sklearn.preprocessing import StandardScaler
 
 GLOBAL_RANDOM_SEED = 244
 random.seed(GLOBAL_RANDOM_SEED)
@@ -89,7 +90,7 @@ class LogisticRegressionClient:
         X = training_data.drop('labels', axis=1)
         y = training_data['labels']
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42)
+            X, y, test_size=0.4, random_state=42)
         self.X = X_train
         self.y = y_train
         self.X_test = X_test
@@ -103,16 +104,22 @@ class LogisticRegressionClient:
         return 1 / (1 + np.exp(-z))
 
     def compute_cost(self, weights, lambda_reg):
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(self.X)
+
         m = len(self.y)
-        h = self.sigmoid(self.X @ weights)
+        h = self.sigmoid(X_scaled @ weights)
         cost = -np.sum(self.y * np.log(h) + (1 - self.y) * np.log(1 - h)) / m
         reg_cost = (lambda_reg / (2 * m)) * np.sum(weights ** 2)
         return cost + reg_cost
 
     def compute_gradient(self, weights, lambda_reg):
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(self.X)
+
         m = len(self.y)
-        h = self.sigmoid(self.X @ weights)
-        gradient = np.dot(self.X.T, (h - self.y)) / m
+        h = self.sigmoid(X_scaled @ weights)
+        gradient = np.dot(X_scaled.T, (h - self.y)) / m
         gradient += (lambda_reg / m) * weights
         return gradient
 
@@ -128,18 +135,18 @@ class LogisticRegressionClient:
         return {"logistic_weights": self.weights}
 
     def predict(self, train_flag=True):
-        if train_flag:
-            probabilities = self.sigmoid(self.X @ self.weights)
-        else:
-            probabilities = self.sigmoid(self.X_test @ self.weights)
-
-        sorted_probabilities = np.sort(probabilities)  # Get indices of sorted probabilities
-        sorted_dotprod = np.sort(self.X @ self.weights)
-
-        print(sorted_probabilities, sorted_dotprod)
-        # print(self.X)
-        # print(self.weights.shape)
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(self.X)
+        X_test_scaled = scaler.fit_transform(self.X_test)
         
+        if train_flag:
+            probabilities = self.sigmoid(X_scaled @ self.weights)
+        else:
+            probabilities = self.sigmoid(X_test_scaled @ self.weights)
+
+        # print(probabilities)
+        # print((probabilities >= 0.5).astype(int))
+                
         return (probabilities >= 0.5).astype(int)
 
     def evaluate(self, train_flag=True):
@@ -153,22 +160,20 @@ class LogisticRegressionClient:
         return test_accuracy
     
     def top_songs(self):
-        logits = self.sigmoid(self.spotify_client.song_catalog_df_numeric @ self.weights)
+        scaler = StandardScaler()
+        dataset_scaled = scaler.fit_transform(self.spotify_client.song_catalog_df_numeric)
+
+        logits = self.sigmoid(dataset_scaled @ self.weights)
         top_10_indices = np.argsort(logits)[-10:][::-1]  # Get top 10 highest logits
-        # print(top_10_indices)
-        # print(np.argsort(logits))
-        # print(logits)
+        print(top_10_indices)
+        print(logits[top_10_indices])
         top_10_songs = self.spotify_client.song_catalog_names.iloc[top_10_indices]
         return top_10_songs
 
 
 num_clients = 5
 
-''' Ryan's IP address! '''
-# server_host = '192.168.192.231'
-
 ''' Stanford's IP address! '''
-# server_host = '10.34.155.96'
 server_host = '10.31.196.86'
 
 server_port = 2600
