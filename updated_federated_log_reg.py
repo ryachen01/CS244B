@@ -14,6 +14,7 @@ from scipy.spatial import distance
 from sklearn.model_selection import train_test_split
 from cryptographpy_helper import generate_cyclic_group, hkdf
 import secrets
+from sklearn.preprocessing import StandardScaler
 
 GLOBAL_RANDOM_SEED = 244
 random.seed(GLOBAL_RANDOM_SEED)
@@ -26,18 +27,17 @@ client_secret = '5bd65999851645be9906a38a53e6a21f'
 
 
 class SpotifyClient():
-    def __init__(self, num_samples=50):
+    def __init__(self, client_index, num_samples=50):
         # model setup
         self.num_samples = num_samples
         self.numeric_features = ['danceability', 'energy', 'key', 'loudness', 'mode', 'speechiness',
                                  'acousticness', 'instrumentalness', 'liveness', 'valence', 'tempo', 'duration_ms', 'time_signature']
         self.model_kmeans = KMeans(n_clusters=5, random_state=0, n_init="auto")
         self.log_reg = None
-        # self.features_df_numeric = pd.read_csv(
-        #     f"data/client_{client_index}_playlist.csv")
         self.features_df_numeric = pd.read_csv(
-            f"/Users/qihan/Documents/GitHub/CS244B/clients_data/local_clients_6.csv").drop(columns=['labels'])
+            f"clients_data/user_{client_index}_10.csv").drop(columns=['labels'])
         self.song_catalog_df_numeric = pd.read_csv("data/song_catalog.csv")
+        self.song_catalog_names = pd.read_csv("data/song_catalog_names.csv")
         self.model_kmeans = KMeans(n_clusters=5, random_state=0)
         self.dataset = None
         self.log_reg = None
@@ -60,16 +60,19 @@ class SpotifyClient():
             distances.append(total_dist)
             # all_songs_dict[tuple(song_feature.values)] = total_dist
         dislike_df['distance'] = distances
-        top_50_dislike_df = dislike_df.nlargest(300, 'distance')
+        top_50_dislike_df = dislike_df.nlargest(100, 'distance')
         top_50_dislike_df = top_50_dislike_df.drop(columns=['distance'])
         top_50_dislike_df['labels'] = 0
         return top_50_dislike_df
 
+    def get_favorite_songs(self):
+        return
+
 
 class LogisticRegressionClient:
-    def __init__(self, lr=0.01, lambda_val=0.2):
+    def __init__(self, client_index, lr=0.01, lambda_val=0.2):
         # create a client's dataset
-        spotify_client = SpotifyClient()
+        spotify_client = SpotifyClient(client_index)
         likes_df = spotify_client.features_df_numeric.copy()
         likes_df['labels'] = 1
         spotify_client.run_knn()
@@ -82,10 +85,11 @@ class LogisticRegressionClient:
         '''
         spotify_client.dataset = pd.concat(client_dataset)
         training_data = spotify_client.dataset.copy()
+        self.spotify_client = spotify_client
         X = training_data.drop('labels', axis=1)
         y = training_data['labels']
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.4, random_state=42)
+            X, y, test_size=0.2, random_state=42)
         self.X = X_train
         self.y = y_train
         self.X_test = X_test
@@ -99,16 +103,22 @@ class LogisticRegressionClient:
         return 1 / (1 + np.exp(-z))
 
     def compute_cost(self, weights, lambda_reg):
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(self.X)
+
         m = len(self.y)
-        h = self.sigmoid(self.X @ weights)
+        h = self.sigmoid(X_scaled @ weights)
         cost = -np.sum(self.y * np.log(h) + (1 - self.y) * np.log(1 - h)) / m
         reg_cost = (lambda_reg / (2 * m)) * np.sum(weights ** 2)
         return cost + reg_cost
 
     def compute_gradient(self, weights, lambda_reg):
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(self.X)
+
         m = len(self.y)
-        h = self.sigmoid(self.X @ weights)
-        gradient = np.dot(self.X.T, (h - self.y)) / m
+        h = self.sigmoid(X_scaled @ weights)
+        gradient = np.dot(X_scaled.T, (h - self.y)) / m
         gradient += (lambda_reg / m) * weights
         return gradient
 
@@ -124,10 +134,18 @@ class LogisticRegressionClient:
         return {"logistic_weights": self.weights}
 
     def predict(self, train_flag=True):
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(self.X)
+        X_test_scaled = scaler.fit_transform(self.X_test)
+
         if train_flag:
-            probabilities = self.sigmoid(self.X @ self.weights)
+            probabilities = self.sigmoid(X_scaled @ self.weights)
         else:
-            probabilities = self.sigmoid(self.X_test @ self.weights)
+            probabilities = self.sigmoid(X_test_scaled @ self.weights)
+
+        # print(probabilities)
+        # print((probabilities >= 0.5).astype(int))
+
         return (probabilities >= 0.5).astype(int)
 
     def evaluate(self, train_flag=True):
@@ -140,11 +158,42 @@ class LogisticRegressionClient:
             test_accuracy = 1 - np.mean(y_pred != self.y_test)
         return test_accuracy
 
+    def top_songs(self):
+        scaler = StandardScaler()
+        dataset_scaled = scaler.fit_transform(
+            self.spotify_client.song_catalog_df_numeric)
 
-model = LogisticRegressionClient()
-for cur_epoch in range(50):
-    print("training model for epoch", cur_epoch)
-    model.train_local(100)
+        logits = self.sigmoid(dataset_scaled @ self.weights)
+        # Get top 10 highest logits
+        top_10_indices = np.argsort(logits)[-10:][::-1]
+        # print(top_10_indices)
+        # print(logits[top_10_indices])
+        top_10_songs = self.spotify_client.song_catalog_names.iloc[top_10_indices]
+        return top_10_songs
 
-print("local train accuracy: ", model.evaluate(train_flag=True))
-print("local test accuracy: ", model.evaluate(train_flag=False))
+
+num_clients = 5
+
+''' Stanford's IP address! '''
+server_host = '10.30.172.59'
+
+server_port = 2500
+
+clients = []
+
+for i in range(num_clients):
+    model = LogisticRegressionClient(i)
+    client = Client(server_host, server_port, model, model.X, model.y)
+    print(f"Hi! I am client {i}")
+    client.run()
+    clients.append(client)
+
+for client in clients:
+    client.wait()
+
+
+for i, client in enumerate(clients):
+    print(f"I am client {i} and here are my results:")
+    print("train accuracy: ", client.model.evaluate(train_flag=True))
+    print("test accuracy: ", client.model.evaluate(train_flag=False))
+    print("top 10 songs: \n ", client.model.top_songs())
